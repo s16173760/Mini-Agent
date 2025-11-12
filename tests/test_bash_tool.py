@@ -1,10 +1,72 @@
 """Test cases for Bash Tool."""
 
 import asyncio
+import platform
+from unittest.mock import patch
 
 import pytest
 
-from mini_agent.tools.bash_tool import BashKillTool, BashOutputTool, BashTool, BackgroundShellManager
+from mini_agent.tools.bash_tool import (
+    BashKillTool,
+    BashOutputTool,
+    BashTool,
+    BackgroundShellManager,
+    get_shell_command,
+)
+
+
+@pytest.mark.asyncio
+async def test_os_detection():
+    """Test that OS detection returns appropriate shell command."""
+    print("\n=== Testing OS Detection ===")
+
+    shell_cmd, shell_args = get_shell_command()
+    current_os = platform.system()
+
+    if current_os == "Windows":
+        assert shell_cmd == "powershell.exe"
+        assert shell_args == ["-NoProfile", "-NonInteractive", "-Command"]
+        print("Windows detected: Using PowerShell")
+    else:
+        assert shell_cmd == "/bin/bash"
+        assert shell_args == ["-c"]
+        print(f"{current_os} detected: Using bash")
+
+
+@pytest.mark.asyncio
+async def test_shell_command_on_linux():
+    """Test shell command selection on Linux."""
+    print("\n=== Testing Linux Shell Command ===")
+
+    with patch("platform.system", return_value="Linux"):
+        shell_cmd, shell_args = get_shell_command()
+        assert shell_cmd == "/bin/bash"
+        assert shell_args == ["-c"]
+        print("Linux: bash selected")
+
+
+@pytest.mark.asyncio
+async def test_shell_command_on_windows():
+    """Test shell command selection on Windows."""
+    print("\n=== Testing Windows Shell Command ===")
+
+    with patch("platform.system", return_value="Windows"):
+        shell_cmd, shell_args = get_shell_command()
+        assert shell_cmd == "powershell.exe"
+        assert shell_args == ["-NoProfile", "-NonInteractive", "-Command"]
+        print("Windows: PowerShell selected")
+
+
+@pytest.mark.asyncio
+async def test_shell_command_on_darwin():
+    """Test shell command selection on macOS (Darwin)."""
+    print("\n=== Testing macOS Shell Command ===")
+
+    with patch("platform.system", return_value="Darwin"):
+        shell_cmd, shell_args = get_shell_command()
+        assert shell_cmd == "/bin/bash"
+        assert shell_args == ["-c"]
+        print("macOS: bash selected")
 
 
 @pytest.mark.asyncio

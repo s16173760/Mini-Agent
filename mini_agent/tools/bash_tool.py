@@ -1,6 +1,7 @@
 """Bash command execution tool with background process management."""
 
 import asyncio
+import platform
 import re
 import time
 import uuid
@@ -9,6 +10,22 @@ from typing import Any
 from pydantic import Field, model_validator
 
 from .base import Tool, ToolResult
+
+
+def get_shell_command() -> tuple[str, list[str]]:
+    """Detect the operating system and return the appropriate shell command.
+    
+    Returns:
+        tuple: (shell_name, shell_args) where shell_args are the arguments to execute a command
+    """
+    system = platform.system()
+    
+    if system == "Windows":
+        # Use PowerShell on Windows
+        return ("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command"])
+    else:
+        # Use bash on Unix-like systems (Linux, macOS, etc.)
+        return ("/bin/bash", ["-c"])
 
 
 class BashOutputResult(ToolResult):
@@ -211,7 +228,7 @@ class BackgroundShellManager:
 
 
 class BashTool(Tool):
-    """Execute bash commands in foreground or background."""
+    """Execute shell commands in foreground or background (bash on Unix, PowerShell on Windows)."""
 
     @property
     def name(self) -> str:
@@ -219,12 +236,13 @@ class BashTool(Tool):
 
     @property
     def description(self) -> str:
-        return """Execute bash commands in foreground or background.
+        return """Execute shell commands in foreground or background.
+Automatically uses bash on Unix-like systems (Linux, macOS) and PowerShell on Windows.
 
 For terminal operations like git, npm, docker, etc. DO NOT use for file operations - use specialized tools.
 
 Parameters:
-  - command (required): Bash command to execute
+  - command (required): Shell command to execute
   - timeout (optional): Timeout in seconds (default: 120, max: 600) for foreground commands
   - run_in_background (optional): Set true for long-running commands (servers, etc.)
 
@@ -246,7 +264,7 @@ Examples:
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "The bash command to execute. Quote file paths with spaces using double quotes.",
+                    "description": "The shell command to execute (bash on Unix, PowerShell on Windows). Quote file paths with spaces using double quotes.",
                 },
                 "timeout": {
                     "type": "integer",
@@ -268,10 +286,10 @@ Examples:
         timeout: int = 120,
         run_in_background: bool = False,
     ) -> ToolResult:
-        """Execute bash command with optional background execution.
+        """Execute shell command with optional background execution.
 
         Args:
-            command: The bash command to execute
+            command: The shell command to execute
             timeout: Timeout in seconds (default: 120, max: 600)
             run_in_background: Set true to run command in background
 
@@ -290,8 +308,13 @@ Examples:
                 # Background execution: Create isolated process
                 bash_id = str(uuid.uuid4())[:8]
 
+                # Get appropriate shell for the current OS
+                shell_cmd, shell_args = get_shell_command()
+                
                 # Start background process with combined stdout/stderr
-                process = await asyncio.create_subprocess_shell(
+                process = await asyncio.create_subprocess_exec(
+                    shell_cmd,
+                    *shell_args,
                     command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,  # Redirect stderr to stdout
@@ -319,7 +342,12 @@ Examples:
 
             else:
                 # Foreground execution: Create isolated process
-                process = await asyncio.create_subprocess_shell(
+                # Get appropriate shell for the current OS
+                shell_cmd, shell_args = get_shell_command()
+                
+                process = await asyncio.create_subprocess_exec(
+                    shell_cmd,
+                    *shell_args,
                     command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
