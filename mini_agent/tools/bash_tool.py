@@ -1,4 +1,8 @@
-"""Bash command execution tool with background process management."""
+"""Shell command execution tool with background process management.
+
+Supports bash on Unix-like systems (Linux, macOS) and PowerShell on Windows
+with automatic OS detection.
+"""
 
 import asyncio
 import platform
